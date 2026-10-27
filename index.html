@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZENORA '26 | Official Event Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: { 400: '#22d3ee', 500: '#06b6d4', 900: '#164e63' },
+                        purple: { 500: '#a855f7', 600: '#9333ea', 900: '#581c87' },
+                        dark: { 900: '#0b0f19', 800: '#111827', 700: '#1f2937' }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome 6 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- QR Code Generator JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML5 QR Code Scanner -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #07090e;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(31, 41, 55, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .neon-glow-cyan {
+            box-shadow: 0 0 25px rgba(34, 211, 238, 0.25);
+        }
+        .neon-glow-purple {
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #22d3ee 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0f19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f2937;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+
+    <!-- Notification Toast Box -->
+    <div id="toastBox" class="fixed top-5 right-5 z-50 flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="sticky top-0 z-40 glass-panel border-b border-gray-800/60">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('home')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-cyan-500/20">
+                    Z
+                </div>
+                <div>
+                    <span id="navSiteTitle" class="text-xl font-black tracking-wider text-white uppercase">ZENORA '26</span>
+                    <span class="block text-[10px] tracking-widest text-cyan-400 font-mono">OFFICIAL PORTAL</span>
+                </div>
+            </div>
+
+            <!-- Desktop Nav Menu -->
+            <nav class="hidden md:flex items-center gap-1 bg-gray-900/60 p-1.5 rounded-2xl border border-gray-800">
+                <button onclick="switchTab('home')" id="nav-home" class="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-cyan-400 bg-cyan-950/50">
+                    <i class="fa-solid fa-house mr-2"></i>Home
+                </button>
+                <button onclick="switchTab('passes')" id="nav-passes" class="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-gray-400 hover:text-white hover:bg-gray-800/50">
+                    <i class="fa-solid fa-ticket mr-2"></i>Get Pass
+                </button>
+                <button onclick="switchTab('mypass')" id="nav-mypass" class="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-gray-400 hover:text-white hover:bg-gray-800/50 relative">
+                    <i class="fa-solid fa-id-card mr-2"></i>My Pass
+                    <span id="passBadge" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full animate-ping"></span>
+                </button>
+                <button onclick="switchTab('venue')" id="nav-venue" class="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-gray-400 hover:text-white hover:bg-gray-800/50">
+                    <i class="fa-solid fa-location-dot mr-2"></i>Venue
+                </button>
+                <button onclick="switchTab('admin')" id="nav-admin" class="px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-gray-400 hover:text-white hover:bg-gray-800/50">
+                    <i class="fa-solid fa-user-shield mr-2"></i>Admin
+                </button>
+            </nav>
+
+            <!-- User Auth Profile Bar -->
+            <div class="flex items-center gap-3">
+                <div id="userProfileArea" class="hidden sm:flex items-center gap-3 bg-gray-900/80 px-3.5 py-1.5 rounded-xl border border-gray-800">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-sm border border-cyan-500/30" id="userAvatar">
+                        U
+                    </div>
+                    <div class="text-left">
+                        <div id="userNameDisplay" class="text-xs font-bold text-gray-200 truncate max-w-[100px]">User</div>
+                        <div id="userRoleBadge" class="text-[9px] font-mono text-cyan-400 uppercase tracking-wider">Student</div>
+                    </div>
+                    <button onclick="logoutUser()" title="Sign Out" class="ml-2 text-gray-400 hover:text-red-400 transition-colors p-1">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+
+                <button id="authBtnNav" onclick="openAuthModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-md hover:opacity-90 transition-all">
+                    <i class="fa-solid fa-lock mr-2"></i>Sign In
+                </button>
+
+                <!-- Mobile Menu Button -->
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2 text-gray-400 hover:text-white rounded-xl bg-gray-900 border border-gray-800">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Dropdown Nav -->
+        <div id="mobileMenu" class="hidden md:hidden bg-gray-950/95 border-b border-gray-800 px-4 py-4 flex-col gap-2">
+            <button onclick="switchTab('home')" class="w-full text-left px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-gray-900">
+                <i class="fa-solid fa-house w-6"></i>Home
+            </button>
+            <button onclick="switchTab('passes')" class="w-full text-left px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-gray-900">
+                <i class="fa-solid fa-ticket w-6"></i>Get Pass
+            </button>
+            <button onclick="switchTab('mypass')" class="w-full text-left px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-gray-900">
+                <i class="fa-solid fa-id-card w-6"></i>My Pass
+            </button>
+            <button onclick="switchTab('venue')" class="w-full text-left px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-gray-900">
+                <i class="fa-solid fa-location-dot w-6"></i>Venue & Directions
+            </button>
+            <button onclick="switchTab('admin')" class="w-full text-left px-4 py-3 rounded-xl font-medium text-gray-300 hover:bg-gray-900">
+                <i class="fa-solid fa-user-shield w-6"></i>Admin Control
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+
+        <!-- ================= HOME SECTION ================= -->
+        <section id="section-home" class="space-y-16">
+            <!-- Hero Banner -->
+            <div class="relative rounded-3xl overflow-hidden glass-panel p-8 sm:p-12 lg:p-16 border border-cyan-500/20 text-center sm:text-left flex flex-col lg:flex-row items-center justify-between gap-10">
+                <div class="absolute -top-32 -left-32 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="max-w-2xl space-y-6 z-10">
+                    <span class="px-4 py-1.5 rounded-full text-xs font-bold tracking-widest bg-cyan-950/80 text-cyan-400 border border-cyan-500/30 uppercase inline-block">
+                        <i class="fa-solid fa-sparkles mr-2"></i>Annual Flagship Event
+                    </span>
+                    <h1 id="heroTitle" class="text-4xl sm:text-6xl font-black text-white leading-tight tracking-tight">
+                        Experience the <span class="text-gradient">Future</span> Today
+                    </h1>
+                    <p id="heroTagline" class="text-base sm:text-lg text-gray-400 font-light leading-relaxed">
+                        Join us at the ultimate tech & cultural extravaganza of 2026. Secure your digital pass, access gate entries, and explore the future!
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-4">
+                        <button onclick="switchTab('passes')" class="px-8 py-4 rounded-2xl font-bold bg-gradient-to-r from-cyan-500 to-purple-600 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all">
+                            <i class="fa-solid fa-ticket-simple mr-2"></i>Book Your Pass Now
+                        </button>
+                        <button onclick="switchTab('venue')" class="px-8 py-4 rounded-2xl font-bold bg-gray-900 hover:bg-gray-800 text-gray-200 border border-gray-700 hover:border-gray-600 transition-all">
+                            <i class="fa-solid fa-map-pin mr-2"></i>View Directions
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Event Countdown Widget -->
+                <div class="z-10 bg-gray-950/80 p-6 sm:p-8 rounded-3xl border border-gray-800 text-center min-w-[300px] w-full lg:w-auto shadow-2xl">
+                    <div class="text-xs font-mono text-gray-400 uppercase tracking-widest mb-4">Event Countdown</div>
+                    <div class="grid grid-cols-4 gap-3 text-center" id="countdownTimer">
+                        <div class="bg-gray-900 p-3 rounded-2xl border border-gray-800">
+                            <span id="cd-days" class="text-2xl sm:text-3xl font-black text-cyan-400 font-mono">00</span>
+                            <span class="block text-[10px] text-gray-500 uppercase">Days</span>
+                        </div>
+                        <div class="bg-gray-900 p-3 rounded-2xl border border-gray-800">
+                            <span id="cd-hours" class="text-2xl sm:text-3xl font-black text-purple-400 font-mono">00</span>
+                            <span class="block text-[10px] text-gray-500 uppercase">Hours</span>
+                        </div>
+                        <div class="bg-gray-900 p-3 rounded-2xl border border-gray-800">
+                            <span id="cd-mins" class="text-2xl sm:text-3xl font-black text-cyan-400 font-mono">00</span>
+                            <span class="block text-[10px] text-gray-500 uppercase">Mins</span>
+                        </div>
+                        <div class="bg-gray-900 p-3 rounded-2xl border border-gray-800">
+                            <span id="cd-secs" class="text-2xl sm:text-3xl font-black text-purple-400 font-mono">00</span>
+                            <span class="block text-[10px] text-gray-500 uppercase">Secs</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
+                        <span><i class="fa-regular fa-calendar-check mr-1 text-cyan-400"></i> Date:</span>
+                        <span id="displayEventDate" class="font-semibold text-gray-200">November 15, 2026</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card p-6 rounded-2xl border border-gray-800 hover:border-cyan-500/40 transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-cyan-950/60 text-cyan-400 flex items-center justify-center text-xl mb-4 border border-cyan-500/20">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Instant Booking</h3>
+                    <p class="text-sm text-gray-400">Direct booking with instant gate pass assignment tied to your registered email account.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl border border-gray-800 hover:border-purple-500/40 transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-purple-950/60 text-purple-400 flex items-center justify-center text-xl mb-4 border border-purple-500/20">
+                        <i class="fa-solid fa-qrcode"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Encrypted Gate QR Pass</h3>
+                    <p class="text-sm text-gray-400">Secure digital pass generated with SHA-256 cryptographic verification upon approval.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl border border-gray-800 hover:border-cyan-500/40 transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-cyan-950/60 text-cyan-400 flex items-center justify-center text-xl mb-4 border border-cyan-500/20">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Owner Controls</h3>
+                    <p class="text-sm text-gray-400">Real-time gate QR scanning, ticket approval workflow, and full website customizer.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= GET PASSES SECTION ================= -->
+        <section id="section-passes" class="hidden space-y-8">
+            <div class="text-center max-w-2xl mx-auto space-y-3">
+                <h2 class="text-3xl font-black text-white">Select Your Event Ticket</h2>
+                <p class="text-gray-400 text-sm">Choose your preferred tier. Pass confirmation is instant and syncs with your registered account.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Standard Pass Card -->
+                <div class="glass-panel rounded-3xl p-8 border border-gray-800 hover:border-cyan-500/50 transition-all flex flex-col justify-between relative overflow-hidden">
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full text-xs font-bold bg-cyan-950 text-cyan-400 border border-cyan-500/30">STANDARD</span>
+                            <i class="fa-solid fa-ticket text-3xl text-cyan-400/40"></i>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-black text-white">LKR <span id="priceStandard">1,500</span></div>
+                            <span class="text-xs text-gray-400 font-mono">Per Entry / Regular Ticket</span>
+                        </div>
+                        <ul class="space-y-3 text-sm text-gray-300">
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-cyan-400"></i> Main Arena General Access</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-cyan-400"></i> Digital Encrypted QR Gate Pass</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-cyan-400"></i> Event Kit & Badge</li>
+                        </ul>
+                    </div>
+                    <button onclick="initiatingBooking('Standard')" class="mt-8 w-full py-3.5 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-black transition-all shadow-lg shadow-cyan-500/20">
+                        Book Standard Pass
+                    </button>
+                </div>
+
+                <!-- VIP Pass Card -->
+                <div class="glass-panel rounded-3xl p-8 border border-purple-500/40 hover:border-purple-500 transition-all flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute -right-12 -top-12 w-32 h-32 bg-purple-500/20 rounded-full blur-2xl"></div>
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between">
+                            <span class="px-3 py-1 rounded-full text-xs font-bold bg-purple-950 text-purple-400 border border-purple-500/30">VIP ACCESS</span>
+                            <i class="fa-solid fa-crown text-3xl text-purple-400/40"></i>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-black text-white">LKR <span id="priceVIP">3,500</span></div>
+                            <span class="text-xs text-gray-400 font-mono">Per Entry / All-Access Pass</span>
+                        </div>
+                        <ul class="space-y-3 text-sm text-gray-300">
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-purple-400"></i> Front Row VIP Seating & Lounge</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-purple-400"></i> Priority Gate Fast-Track Clearance</li>
+                            <li class="flex items-center gap-2"><i class="fa-solid fa-circle-check text-purple-400"></i> Exclusive Merch Pack & Refreshments</li>
+                        </ul>
+                    </div>
+                    <button onclick="initiatingBooking('VIP')" class="mt-8 w-full py-3.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">
+                        Book VIP Pass
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= MY PASS SECTION ================= -->
+        <section id="section-mypass" class="hidden space-y-8">
+            <div class="text-center max-w-xl mx-auto space-y-2">
+                <h2 class="text-3xl font-black text-white">My Event Passes</h2>
+                <p class="text-gray-400 text-sm">View your active tickets and show your approved QR code at the entrance gate.</p>
+            </div>
+
+            <div id="myPassesContainer" class="max-w-2xl mx-auto space-y-6">
+                <!-- Dynamic Passes Rendered Here -->
+            </div>
+        </section>
+
+        <!-- ================= VENUE & DIRECTIONS SECTION ================= -->
+        <section id="section-venue" class="hidden space-y-8">
+            <div class="text-center max-w-xl mx-auto space-y-2">
+                <h2 class="text-3xl font-black text-white">Venue & Location</h2>
+                <p class="text-gray-400 text-sm">Find your way to the grand event. Get real-time directions on Google Maps.</p>
+            </div>
+
+            <div class="max-w-5xl mx-auto glass-panel p-6 sm:p-8 rounded-3xl border border-gray-800 space-y-6">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-gray-900/80 border border-gray-800">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-cyan-950 text-cyan-400 flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-building-columns"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-400 uppercase font-mono">Location Venue</span>
+                            <h3 id="venueNameDisplay" class="text-xl font-bold text-white">Main Auditorium, University Complex</h3>
+                        </div>
+                    </div>
+                    <a id="venueMapBtn" href="https://maps.google.com" target="_blank" rel="noopener noreferrer" class="px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-sm transition-all flex items-center gap-2 w-full md:w-auto justify-center">
+                        <i class="fa-solid fa-diamond-turn-right"></i> Open Google Maps
+                    </a>
+                </div>
+
+                <!-- Google Maps Embed Container -->
+                <div class="w-full h-96 rounded-2xl overflow-hidden border border-gray-800 shadow-xl relative bg-gray-900">
+                    <iframe id="venueIframe" class="w-full h-full border-0" loading="lazy" allowfullscreen src="https://maps.google.com/maps?q=Colombo,%20Sri%20Lanka&t=&z=13&ie=UTF8&iwloc=&output=embed"></iframe>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ADMIN CONTROL PORTAL SECTION ================= -->
+        <section id="section-admin" class="hidden space-y-8">
+            <div id="adminAuthGate" class="max-w-md mx-auto glass-panel p-8 rounded-3xl border border-gray-800 text-center space-y-6">
+                <div class="w-16 h-16 rounded-2xl bg-purple-950/80 text-purple-400 flex items-center justify-center text-2xl mx-auto border border-purple-500/30">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-black text-white">Owner / Admin Passcode</h2>
+                    <p class="text-xs text-gray-400 mt-1">Enter administrative passcode to unlock owner management.</p>
+                </div>
+                <div class="space-y-4">
+                    <input type="password" id="adminPasscodeInput" placeholder="Enter Admin Passcode" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-center text-white focus:outline-none focus:border-cyan-500">
+                    <button onclick="verifyAdminPasscode()" class="w-full py-3 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-black transition-all">
+                        Unlock Admin Portal
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Content (Hidden until authenticated) -->
+            <div id="adminDashboard" class="hidden space-y-8">
+                <!-- Admin Header Bar -->
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 glass-panel p-6 rounded-3xl border border-purple-500/30">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-bold">
+                            <i class="fa-solid fa-user-gear"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Owner Administration Hub</h2>
+                            <p class="text-xs text-gray-400">Manage gate clearance, registered users, and system options.</p>
+                        </div>
+                    </div>
+                    <button onclick="lockAdminPortal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900/60 transition-all">
+                        <i class="fa-solid fa-lock mr-2"></i>Lock Admin Panel
+                    </button>
+                </div>
+
+                <!-- Admin Tabs Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+                    <!-- GATE QR CODE SCANNER -->
+                    <div class="glass-panel p-6 rounded-3xl border border-gray-800 space-y-4">
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                            <h3 class="font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-camera text-cyan-400"></i> Gate Pass Scanner
+                            </h3>
+                            <span class="text-[10px] font-mono bg-cyan-950 text-cyan-400 px-2 py-0.5 rounded border border-cyan-500/30">LIVE GATE</span>
+                        </div>
+                        <p class="text-xs text-gray-400">Scan attendee QR pass for instant gate entry verification.</p>
+
+                        <div id="qr-reader" class="rounded-2xl overflow-hidden border border-gray-800 bg-gray-950 min-h-[220px]"></div>
+
+                        <div class="space-y-2">
+                            <button onclick="startQRScanner()" class="w-full py-2.5 rounded-xl text-xs font-bold bg-gray-900 hover:bg-gray-800 text-cyan-400 border border-cyan-500/30 transition-all">
+                                <i class="fa-solid fa-video mr-1"></i> Launch Camera
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- TICKET APPROVAL & USER MANAGEMENT -->
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-3xl border border-gray-800 space-y-4">
+                        <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                            <h3 class="font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-purple-400"></i> Ticket Approval Requests
+                            </h3>
+                            <div class="flex gap-2 text-xs">
+                                <span id="pendingCountBadge" class="bg-yellow-950 text-yellow-400 px-2 py-0.5 rounded border border-yellow-500/30">0 Pending</span>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-gray-300">
+                                <thead class="bg-gray-900/80 text-gray-400 uppercase text-[10px] font-mono">
+                                    <tr>
+                                        <th class="p-3">User & Email</th>
+                                        <th class="p-3">Ticket Type</th>
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3">Token Hash</th>
+                                        <th class="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminTicketsTable" class="divide-y divide-gray-800/60">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FULL DYNAMIC SITE CUSTOMIZER -->
+                <div class="glass-panel p-6 sm:p-8 rounded-3xl border border-cyan-500/30 space-y-6">
+                    <div class="border-b border-gray-800 pb-4">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-cyan-400"></i> Dynamic Portal Customizer
+                        </h3>
+                        <p class="text-xs text-gray-400">Modify portal titles, countdowns, pricing, and administrative passwords in real time.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Portal Title</label>
+                            <input type="text" id="custSiteTitle" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Event Tagline</label>
+                            <input type="text" id="custTagline" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Event Date (YYYY-MM-DD HH:MM)</label>
+                            <input type="datetime-local" id="custEventDate" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Venue Name</label>
+                            <input type="text" id="custVenueName" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Google Maps Embed/Search Query</label>
+                            <input type="text" id="custMapsQuery" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Standard Ticket Price (LKR)</label>
+                            <input type="number" id="custPriceStandard" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">VIP Ticket Price (LKR)</label>
+                            <input type="number" id="custPriceVIP" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-semibold text-gray-300">Admin Passcode</label>
+                            <input type="text" id="custAdminPasscode" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-2.5 text-sm text-white focus:border-cyan-500">
+                        </div>
+                    </div>
+
+                    <button onclick="saveCustomizerSettings()" class="px-8 py-3 rounded-xl font-bold bg-cyan-500 hover:bg-cyan-400 text-black transition-all shadow-lg shadow-cyan-500/20">
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Save Portal Settings
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="glass-panel border-t border-gray-800/80 mt-12 py-8">
+        <div class="max-w-7xl mx-auto px-4 text-center space-y-3">
+            <p id="footerTitle" class="text-sm font-bold text-gray-400">ZENORA '26 &copy; All Rights Reserved.</p>
+            <p class="text-xs text-gray-600 font-mono">Encrypted Digital Ticketing & Gate Authorization System</p>
+        </div>
+    </footer>
+
+    <!-- ================= AUTHENTICATION MODAL (SIGN IN / SIGN UP) ================= -->
+    <div id="authModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl relative">
+            <button onclick="closeAuthModal()" class="absolute top-5 right-5 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+
+            <!-- Mode Selector Tabs -->
+            <div class="flex border-b border-gray-800 mb-6">
+                <button id="authTabSignIn" onclick="switchAuthMode('signin')" class="flex-1 py-3 font-bold text-sm text-cyan-400 border-b-2 border-cyan-400">
+                    Sign In
+                </button>
+                <button id="authTabSignUp" onclick="switchAuthMode('signup')" class="flex-1 py-3 font-bold text-sm text-gray-400 border-b-2 border-transparent hover:text-white">
+                    Register Account
+                </button>
+            </div>
+
+            <!-- SIGN IN FORM -->
+            <form id="signInForm" onsubmit="handleSignIn(event)" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Email Address</label>
+                    <input type="email" id="loginEmail" required placeholder="user@example.com" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <button type="submit" class="w-full py-3.5 rounded-xl font-bold bg-gradient-to-r from-cyan-500 to-purple-600 text-white hover:opacity-90 transition-all shadow-lg shadow-cyan-500/20">
+                    Sign In
+                </button>
+            </form>
+
+            <!-- SIGN UP FORM -->
+            <form id="signUpForm" onsubmit="handleSignUp(event)" class="space-y-4 hidden">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Full Name</label>
+                    <input type="text" id="regName" required placeholder="John Doe" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Email Address</label>
+                    <input type="email" id="regEmail" required placeholder="user@example.com" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Password</label>
+                    <input type="password" id="regPassword" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Role</label>
+                    <select id="regRole" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
+                        <option value="Student">Attendee / Student</option>
+                        <option value="Admin">Administrator</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full py-3.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">
+                    Create Account
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT APPLICATION LOGIC -->
+    <script>
+        // Default System Config State
+        let siteSettings = {
+            title: "ZENORA '26",
+            tagline: "Experience the Future Today",
+            eventDate: "2026-11-15T18:00",
+            venueName: "Main Auditorium, University Complex",
+            mapsQuery: "Colombo, Sri Lanka",
+            priceStandard: 1500,
+            priceVIP: 3500,
+            adminPasscode: "zenora2026"
+        };
+
+        // Persistent Data Keys
+        const STORAGE_USERS = "zenora_users";
+        const STORAGE_SESSION = "zenora_current_user";
+        const STORAGE_TICKETS = "zenora_tickets";
+        const STORAGE_SETTINGS = "zenora_settings";
+
+        // Global State
+        let currentUser = null;
+        let html5QrScanner = null;
+
+        // Initialize App
+        window.onload = function() {
+            loadSettings();
+            initAuthSession();
+            loadTicketPasses();
+            startCountdownLoop();
+            renderAdminTickets();
+        };
+
+        // Load Customizer Settings
+        function loadSettings() {
+            const saved = localStorage.getItem(STORAGE_SETTINGS);
+            if (saved) {
+                try { siteSettings = { ...siteSettings, ...JSON.parse(saved) }; } catch(e){}
+            }
+            applySettingsUI();
+        }
+
+        function applySettingsUI() {
+            document.getElementById('navSiteTitle').innerText = siteSettings.title;
+            document.getElementById('heroTitle').innerHTML = siteSettings.title + " <span class='text-gradient'>Portal</span>";
+            document.getElementById('heroTagline').innerText = siteSettings.tagline;
+            document.getElementById('priceStandard').innerText = siteSettings.priceStandard.toLocaleString();
+            document.getElementById('priceVIP').innerText = siteSettings.priceVIP.toLocaleString();
+            document.getElementById('venueNameDisplay').innerText = siteSettings.venueName;
+            document.getElementById('footerTitle').innerText = `${siteSettings.title} © All Rights Reserved.`;
+
+            // Populate Map
+            const encodedMap = encodeURIComponent(siteSettings.mapsQuery);
+            document.getElementById('venueIframe').src = `https://maps.google.com/maps?q=${encodedMap}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+            document.getElementById('venueMapBtn').href = `https://www.google.com/maps/search/?api=1&query=${encodedMap}`;
+
+            // Admin Customizer Form Defaults
+            document.getElementById('custSiteTitle').value = siteSettings.title;
+            document.getElementById('custTagline').value = siteSettings.tagline;
+            document.getElementById('custEventDate').value = siteSettings.eventDate;
+            document.getElementById('custVenueName').value = siteSettings.venueName;
+            document.getElementById('custMapsQuery').value = siteSettings.mapsQuery;
+            document.getElementById('custPriceStandard').value = siteSettings.priceStandard;
+            document.getElementById('custPriceVIP').value = siteSettings.priceVIP;
+            document.getElementById('custAdminPasscode').value = siteSettings.adminPasscode;
+        }
+
+        function saveCustomizerSettings() {
+            siteSettings.title = document.getElementById('custSiteTitle').value || "ZENORA '26";
+            siteSettings.tagline = document.getElementById('custTagline').value;
+            siteSettings.eventDate = document.getElementById('custEventDate').value;
+            siteSettings.venueName = document.getElementById('custVenueName').value;
+            siteSettings.mapsQuery = document.getElementById('custMapsQuery').value;
+            siteSettings.priceStandard = parseInt(document.getElementById('custPriceStandard').value) || 1500;
+            siteSettings.priceVIP = parseInt(document.getElementById('custPriceVIP').value) || 3500;
+            siteSettings.adminPasscode = document.getElementById('custAdminPasscode').value || "zenora2026";
+
+            localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(siteSettings));
+            applySettingsUI();
+            showToast("Settings saved successfully!", "success");
+        }
+
+        // ================= AUTHENTICATION & SESSION MANAGEMENT =================
+        function getUsersDB() {
+            return JSON.parse(localStorage.getItem(STORAGE_USERS) || "[]");
+        }
+
+        function saveUsersDB(users) {
+            localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+        }
+
+        function initAuthSession() {
+            const savedSession = localStorage.getItem(STORAGE_SESSION);
+            if (savedSession) {
+                try {
+                    currentUser = JSON.parse(savedSession);
+                    updateUserUI();
+                } catch(e) {
+                    logoutUser();
+                }
+            } else {
+                updateUserUI();
+            }
+        }
+
+        function updateUserUI() {
+            const profileArea = document.getElementById('userProfileArea');
+            const authBtnNav = document.getElementById('authBtnNav');
+
+            if (currentUser) {
+                profileArea.classList.remove('hidden');
+                authBtnNav.classList.add('hidden');
+                document.getElementById('userNameDisplay').innerText = currentUser.name;
+                document.getElementById('userRoleBadge').innerText = currentUser.role || 'Student';
+                document.getElementById('userAvatar').innerText = currentUser.name.charAt(0).toUpperCase();
+            } else {
+                profileArea.classList.add('hidden');
+                authBtnNav.classList.remove('hidden');
+            }
+            renderMyPasses();
+        }
+
+        function openAuthModal() {
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        function switchAuthMode(mode) {
+            const signInForm = document.getElementById('signInForm');
+            const signUpForm = document.getElementById('signUpForm');
+            const tabSignIn = document.getElementById('authTabSignIn');
+            const tabSignUp = document.getElementById('authTabSignUp');
+
+            if (mode === 'signin') {
+                signInForm.classList.remove('hidden');
+                signUpForm.classList.add('hidden');
+                tabSignIn.className = "flex-1 py-3 font-bold text-sm text-cyan-400 border-b-2 border-cyan-400";
+                tabSignUp.className = "flex-1 py-3 font-bold text-sm text-gray-400 border-b-2 border-transparent hover:text-white";
+            } else {
+                signInForm.classList.add('hidden');
+                signUpForm.classList.remove('hidden');
+                tabSignUp.className = "flex-1 py-3 font-bold text-sm text-purple-400 border-b-2 border-purple-400";
+                tabSignIn.className = "flex-1 py-3 font-bold text-sm text-gray-400 border-b-2 border-transparent hover:text-white";
+            }
+        }
+
+        function handleSignUp(e) {
+            e.preventDefault();
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim().toLowerCase();
+            const password = document.getElementById('regPassword').value;
+            const role = document.getElementById('regRole').value;
+
+            const users = getUsersDB();
+            if (users.find(u => u.email === email)) {
+                showToast("Account with this email already exists!", "error");
+                return;
+            }
+
+            const newUser = {
+                id: 'USR_' + Math.random().toString(36).substr(2, 9),
+                name,
+                email,
+                password, // Saved into local storage
+                role,
+                created: new Date().toISOString()
+            };
+
+            users.push(newUser);
+            saveUsersDB(users);
+
+            // Log user in
+            currentUser = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role };
+            localStorage.setItem(STORAGE_SESSION, JSON.stringify(currentUser));
+            updateUserUI();
+            closeAuthModal();
+            showToast(`Welcome ${name}! Account registered successfully.`, "success");
+        }
+
+        function handleSignIn(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+            const password = document.getElementById('loginPassword').value;
+
+            const users = getUsersDB();
+            const user = users.find(u => u.email === email && u.password === password);
+
+            if (!user) {
+                showToast("Invalid email or password credentials!", "error");
+                return;
+            }
+
+            currentUser = { id: user.id, name: user.name, email: user.email, role: user.role };
+            localStorage.setItem(STORAGE_SESSION, JSON.stringify(currentUser));
+            updateUserUI();
+            closeAuthModal();
+            showToast(`Logged in as ${user.name}`, "success");
+        }
+
+        function logoutUser() {
+            currentUser = null;
+            localStorage.removeItem(STORAGE_SESSION);
+            updateUserUI();
+            showToast("Signed out successfully.", "info");
+        }
+
+        // ================= NAVIGATION & TABS =================
+        function switchTab(tabId) {
+            const tabs = ['home', 'passes', 'mypass', 'venue', 'admin'];
+            tabs.forEach(t => {
+                document.getElementById(`section-${t}`).classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) {
+                    navBtn.className = "px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-gray-400 hover:text-white hover:bg-gray-800/50";
+                }
+            });
+
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.className = "px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-300 text-cyan-400 bg-cyan-950/50";
+            }
+            document.getElementById('mobileMenu').classList.add('hidden');
+
+            if (tabId === 'mypass') renderMyPasses();
+            if (tabId === 'admin') renderAdminTickets();
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('mobileMenu').classList.toggle('hidden');
+        }
+
+        // ================= TICKET BOOKING & ENCRYPTED PASSES =================
+        function getTicketsDB() {
+            return JSON.parse(localStorage.getItem(STORAGE_TICKETS) || "[]");
+        }
+
+        function saveTicketsDB(tickets) {
+            localStorage.setItem(STORAGE_TICKETS, JSON.stringify(tickets));
+        }
+
+        function initiatingBooking(type) {
+            if (!currentUser) {
+                showToast("Please sign in or register an account to book tickets!", "warning");
+                openAuthModal();
+                return;
+            }
+
+            const tickets = getTicketsDB();
+            const price = type === 'VIP' ? siteSettings.priceVIP : siteSettings.priceStandard;
+
+            const newTicket = {
+                id: 'TKT_' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                userId: currentUser.id,
+                userName: currentUser.name,
+                userEmail: currentUser.email,
+                type: type,
+                price: price,
+                status: 'Pending Approval', // Default state until admin approves
+                tokenHash: null,
+                timestamp: new Date().toLocaleString()
+            };
+
+            tickets.push(newTicket);
+            saveTicketsDB(tickets);
+            showToast(`${type} Pass request submitted! Awaiting Admin Gate Clearance.`, "success");
+            switchTab('mypass');
+        }
+
+        // Simple cryptographic-style token generator
+        async function generateSHA256Hash(text) {
+            const msgUint8 = new TextEncoder().encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function renderMyPasses() {
+            const container = document.getElementById('myPassesContainer');
+            container.innerHTML = '';
+
+            if (!currentUser) {
+                container.innerHTML = `
+                    <div class="glass-panel p-8 rounded-3xl text-center space-y-4 border border-gray-800">
+                        <i class="fa-solid fa-user-lock text-4xl text-gray-500"></i>
+                        <h3 class="text-xl font-bold text-white">Authentication Required</h3>
+                        <p class="text-xs text-gray-400">Please sign in to access your digital gate pass tickets.</p>
+                        <button onclick="openAuthModal()" class="px-6 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black">Sign In Now</button>
+                    </div>
+                `;
+                return;
+            }
+
+            const tickets = getTicketsDB().filter(t => t.userId === currentUser.id);
+
+            if (tickets.length === 0) {
+                container.innerHTML = `
+                    <div class="glass-panel p-8 rounded-3xl text-center space-y-4 border border-gray-800">
+                        <i class="fa-solid fa-ticket-simple text-4xl text-gray-600"></i>
+                        <h3 class="text-xl font-bold text-white">No Active Passes Found</h3>
+                        <p class="text-xs text-gray-400">You haven't booked any event passes yet.</p>
+                        <button onclick="switchTab('passes')" class="px-6 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-black">Browse Tickets</button>
+                    </div>
+                `;
+                return;
+            }
+
+            tickets.forEach(ticket => {
+                const card = document.createElement('div');
+                card.className = "glass-panel p-6 sm:p-8 rounded-3xl border border-gray-800 relative space-y-6";
+
+                const isApproved = ticket.status === 'Approved';
+
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                        <div>
+                            <span class="text-[10px] font-mono text-cyan-400 tracking-wider">TICKET ID: ${ticket.id}</span>
+                            <h3 class="text-xl font-black text-white">${ticket.type} Gate Pass</h3>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold ${isApproved ? 'bg-green-950 text-green-400 border border-green-500/30' : 'bg-yellow-950 text-yellow-400 border border-yellow-500/30'}">
+                            ${isApproved ? '<i class="fa-solid fa-check-circle mr-1"></i> Approved Gate Pass' : '<i class="fa-solid fa-clock mr-1"></i> Pending Approval'}
+                        </span>
+                    </div>
+
+                    <div class="flex flex-col md:flex-row items-center gap-6">
+                        <div class="bg-white p-3 rounded-2xl shadow-xl flex items-center justify-center min-w-[160px] min-h-[160px]" id="qr-container-${ticket.id}">
+                        </div>
+
+                        <div class="space-y-2 text-xs text-gray-300 w-full">
+                            <div class="flex justify-between border-b border-gray-800/60 py-1">
+                                <span class="text-gray-400">Attendee Name:</span>
+                                <span class="font-semibold text-white">${ticket.userName}</span>
+                            </div>
+                            <div class="flex justify-between border-b border-gray-800/60 py-1">
+                                <span class="text-gray-400">Email:</span>
+                                <span class="font-semibold text-white">${ticket.userEmail}</span>
+                            </div>
+                            <div class="flex justify-between border-b border-gray-800/60 py-1">
+                                <span class="text-gray-400">Price Paid:</span>
+                                <span class="font-semibold text-cyan-400">LKR ${ticket.price.toLocaleString()}</span>
+                            </div>
+                            <div class="flex justify-between border-b border-gray-800/60 py-1">
+                                <span class="text-gray-400">Encrypted Token:</span>
+                                <span class="font-mono text-[10px] text-purple-400 truncate max-w-[180px]">${ticket.tokenHash || 'Awaiting Crypto Signature'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+
+                // Render QR Code
+                setTimeout(() => {
+                    const qrBox = document.getElementById(`qr-container-${ticket.id}`);
+                    qrBox.innerHTML = '';
+                    const payload = isApproved ? ticket.tokenHash : `PENDING_${ticket.id}`;
+                    new QRCode(qrBox, {
+                        text: payload,
+                        width: 140,
+                        height: 140,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }, 100);
+            });
+        }
+
+        // ================= ADMIN PORTAL & APPROVAL WORKFLOW =================
+        function verifyAdminPasscode() {
+            const input = document.getElementById('adminPasscodeInput').value;
+            if (input === siteSettings.adminPasscode) {
+                document.getElementById('adminAuthGate').classList.add('hidden');
+                document.getElementById('adminDashboard').classList.remove('hidden');
+                showToast("Admin portal unlocked", "success");
+                renderAdminTickets();
+            } else {
+                showToast("Incorrect Admin Passcode!", "error");
+            }
+        }
+
+        function lockAdminPortal() {
+            document.getElementById('adminAuthGate').classList.remove('hidden');
+            document.getElementById('adminDashboard').classList.add('hidden');
+            document.getElementById('adminPasscodeInput').value = '';
+        }
+
+        function renderAdminTickets() {
+            const tickets = getTicketsDB();
+            const tbody = document.getElementById('adminTicketsTable');
+            tbody.innerHTML = '';
+
+            const pending = tickets.filter(t => t.status === 'Pending Approval').length;
+            document.getElementById('pendingCountBadge').innerText = `${pending} Pending`;
+
+            if (tickets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No ticket records found.</td></tr>`;
+                return;
+            }
+
+            tickets.forEach(t => {
+                const tr = document.createElement('tr');
+                const isApp = t.status === 'Approved';
+                tr.innerHTML = `
+                    <td class="p-3">
+                        <div class="font-bold text-white">${t.userName}</div>
+                        <div class="text-[10px] text-gray-400">${t.userEmail}</div>
+                    </td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded font-mono text-[10px] ${t.type === 'VIP' ? 'bg-purple-950 text-purple-400' : 'bg-cyan-950 text-cyan-400'}">${t.type}</span></td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded text-[10px] ${isApp ? 'bg-green-950 text-green-400' : 'bg-yellow-950 text-yellow-400'}">${t.status}</span>
+                    </td>
+                    <td class="p-3 font-mono text-[9px] text-gray-400">${t.tokenHash ? t.tokenHash.substr(0, 12) + '...' : 'None'}</td>
+                    <td class="p-3 text-right">
+                        ${!isApp ? `
+                            <button onclick="approveTicket('${t.id}')" class="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-[10px]">
+                                Approve
+                            </button>
+                        ` : `
+                            <button onclick="revokeTicket('${t.id}')" class="px-3 py-1 rounded bg-red-950 hover:bg-red-900 text-red-400 border border-red-500/30 text-[10px]">
+                                Revoke
+                            </button>
+                        `}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function approveTicket(ticketId) {
+            let tickets = getTicketsDB();
+            const index = tickets.findIndex(t => t.id === ticketId);
+            if (index !== -1) {
+                tickets[index].status = 'Approved';
+                // Cryptographic token computation
+                tickets[index].tokenHash = await generateSHA256Hash(ticketId + "_" + tickets[index].userId + "_" + Date.now());
+                saveTicketsDB(tickets);
+                renderAdminTickets();
+                showToast(`Ticket ${ticketId} approved & cryptographic pass unlocked!`, "success");
+            }
+        }
+
+        function revokeTicket(ticketId) {
+            let tickets = getTicketsDB();
+            const index = tickets.findIndex(t => t.id === ticketId);
+            if (index !== -1) {
+                tickets[index].status = 'Pending Approval';
+                tickets[index].tokenHash = null;
+                saveTicketsDB(tickets);
+                renderAdminTickets();
+                showToast(`Ticket ${ticketId} status revoked.`, "info");
+            }
+        }
+
+        // QR Scanner Logic
+        function startQRScanner() {
+            if (html5QrScanner) {
+                html5QrScanner.clear();
+            }
+
+            html5QrScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 200, height: 200 } });
+            html5QrScanner.render((decodedText) => {
+                const tickets = getTicketsDB();
+                const matched = tickets.find(t => t.tokenHash === decodedText);
+
+                if (matched) {
+                    showToast(`VALID ENTRY PASS! Attendee: ${matched.userName} (${matched.type} Pass)`, "success");
+                } else {
+                    showToast("INVALID OR UNAPPROVED GATE PASS!", "error");
+                }
+            }, (error) => {
+                // Ignore scanner scan loop errors
+            });
+        }
+
+        // ================= COUNTDOWN TIMER =================
+        function startCountdownLoop() {
+            setInterval(() => {
+                const target = new Date(siteSettings.eventDate).getTime();
+                const now = new Date().getTime();
+                const diff = target - now;
+
+                if (diff <= 0) {
+                    document.getElementById('cd-days').innerText = "00";
+                    document.getElementById('cd-hours').innerText = "00";
+                    document.getElementById('cd-mins').innerText = "00";
+                    document.getElementById('cd-secs').innerText = "00";
+                    return;
+                }
+
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+                document.getElementById('cd-days').innerText = String(days).padStart(2, '0');
+                document.getElementById('cd-hours').innerText = String(hours).padStart(2, '0');
+                document.getElementById('cd-mins').innerText = String(mins).padStart(2, '0');
+                document.getElementById('cd-secs').innerText = String(secs).padStart(2, '0');
+            }, 1000);
+        }
+
+        // ================= TOAST NOTIFICATION UTILITY =================
+        function showToast(message, type = "info") {
+            const toastBox = document.getElementById('toastBox');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-gray-900 border-gray-800 text-gray-200";
+            if (type === "success") bgClass = "bg-green-950 border-green-500/40 text-green-300";
+            if (type === "error") bgClass = "bg-red-950 border-red-500/40 text-red-300";
+            if (type === "warning") bgClass = "bg-yellow-950 border-yellow-500/40 text-yellow-300";
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-2xl border ${bgClass} shadow-2xl flex items-center gap-3 text-xs font-semibold animate-bounce`;
+            toast.innerHTML = `<span>${message}</span>`;
+
+            toastBox.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+    </script>
+</body>
+</html>

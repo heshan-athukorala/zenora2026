@@ -539,13 +539,6 @@
                     <label class="text-xs font-semibold text-gray-300">Password</label>
                     <input type="password" id="regPassword" required placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
                 </div>
-                <div class="space-y-1">
-                    <label class="text-xs font-semibold text-gray-300">Role</label>
-                    <select id="regRole" class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500">
-                        <option value="Student">Attendee / Student</option>
-                        <option value="Admin">Administrator</option>
-                    </select>
-                </div>
                 <button type="submit" class="w-full py-3.5 rounded-xl font-bold bg-gradient-to-r from-purple-600 to-cyan-500 text-white hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">
                     Create Account
                 </button>
@@ -553,6 +546,10 @@
         </div>
     </div>
 
+    <!-- Firebase compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
     <!-- SCRIPT APPLICATION LOGIC -->
     <script>
         // Default System Config State
@@ -562,28 +559,36 @@
             eventDate: "2026-11-15T18:00",
             venueName: "Main Auditorium, University Complex",
             mapsQuery: "Colombo, Sri Lanka",
-            priceStandard: 1500,
-            priceVIP: 3500,
-            adminPasscode: "zenora2026"
+            priceStandard: 4000,
+            priceVIP: 5000,
+            adminPasscode: ""
         };
 
-        // Persistent Data Keys
-        const STORAGE_USERS = "zenora_users";
-        const STORAGE_SESSION = "zenora_current_user";
-        const STORAGE_TICKETS = "zenora_tickets";
-        const STORAGE_SETTINGS = "zenora_settings";
+        // Firebase configuration for the ZENORA '26 web app.
+        // Firebase web config is public; database access is protected by Firestore Rules.
+        const firebaseConfig = {
+            apiKey: "AIzaSyAYTTfw4TSY10ed1JIR67b7nIYu37CV05Y",
+            authDomain: "zenora-26.firebaseapp.com",
+            projectId: "zenora-26",
+            appId: "1:803200892631:web:9502338730dd9b45407a92"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const ticketsRef = db.collection('tickets');
 
         // Global State
         let currentUser = null;
+        let isOwner = false;
         let html5QrScanner = null;
+        let liveTickets = [];
+        let ticketsUnsubscribe = null;
 
         // Initialize App
         window.onload = function() {
             loadSettings();
             initAuthSession();
-            loadTicketPasses();
             startCountdownLoop();
-            renderAdminTickets();
         };
 
         // Load Customizer Settings
@@ -592,6 +597,9 @@
             if (saved) {
                 try { siteSettings = { ...siteSettings, ...JSON.parse(saved) }; } catch(e){}
             }
+            // Prices are fixed to the event's agreed tiers until cloud-synced settings are implemented.
+            siteSettings.priceStandard = 4000;
+            siteSettings.priceVIP = 5000;
             applySettingsUI();
         }
 
@@ -617,7 +625,10 @@
             document.getElementById('custMapsQuery').value = siteSettings.mapsQuery;
             document.getElementById('custPriceStandard').value = siteSettings.priceStandard;
             document.getElementById('custPriceVIP').value = siteSettings.priceVIP;
-            document.getElementById('custAdminPasscode').value = siteSettings.adminPasscode;
+            document.getElementById('custPriceStandard').disabled = true;
+            document.getElementById('custPriceVIP').disabled = true;
+            const passcodeField = document.getElementById('custAdminPasscode');
+            if (passcodeField) passcodeField.value = "";
         }
 
         function saveCustomizerSettings() {
@@ -626,140 +637,106 @@
             siteSettings.eventDate = document.getElementById('custEventDate').value;
             siteSettings.venueName = document.getElementById('custVenueName').value;
             siteSettings.mapsQuery = document.getElementById('custMapsQuery').value;
-            siteSettings.priceStandard = parseInt(document.getElementById('custPriceStandard').value) || 1500;
-            siteSettings.priceVIP = parseInt(document.getElementById('custPriceVIP').value) || 3500;
-            siteSettings.adminPasscode = document.getElementById('custAdminPasscode').value || "zenora2026";
-
-            localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(siteSettings));
+            siteSettings.priceStandard = 4000;
+            siteSettings.priceVIP = 5000;
+            if (!isOwner) { showToast("Only verified owners can change settings.", "error"); return; }
+            // Event settings are currently stored on this browser only; cloud-wide settings are a separate next step.
+            localStorage.setItem('zenora_settings', JSON.stringify(siteSettings));
             applySettingsUI();
-            showToast("Settings saved successfully!", "success");
+            showToast("Settings saved on this browser. Cloud-wide sync is not enabled yet.", "info");
         }
 
-        // ================= AUTHENTICATION & SESSION MANAGEMENT =================
-        function getUsersDB() {
-            return JSON.parse(localStorage.getItem(STORAGE_USERS) || "[]");
-        }
-
-        function saveUsersDB(users) {
-            localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
-        }
-
-        function initAuthSession() {
-            const savedSession = localStorage.getItem(STORAGE_SESSION);
-            if (savedSession) {
-                try {
-                    currentUser = JSON.parse(savedSession);
-                    updateUserUI();
-                } catch(e) {
-                    logoutUser();
+        // ================= FIREBASE AUTHENTICATION =================
+        async function initAuthSession() {
+            auth.onAuthStateChanged(async (user) => {
+                if (ticketsUnsubscribe) { ticketsUnsubscribe(); ticketsUnsubscribe = null; }
+                if (!user) {
+                    currentUser = null; isOwner = false; liveTickets = [];
+                    updateUserUI(); updateAdminAccess(); renderAdminTickets();
+                    return;
                 }
-            } else {
-                updateUserUI();
-            }
+                let displayName = user.displayName || (user.email || 'Attendee').split('@')[0];
+                try {
+                    const profile = await db.collection('users').doc(user.uid).get();
+                    if (profile.exists && profile.data().name) displayName = profile.data().name;
+                } catch (e) { console.warn('Profile read:', e); }
+                currentUser = { id: user.uid, name: displayName, email: user.email || '' };
+                try {
+                    const ownerDoc = await db.collection('owners').doc(user.uid).get();
+                    isOwner = ownerDoc.exists && ownerDoc.data().role === 'owner';
+                } catch (e) { isOwner = false; console.warn('Owner check:', e); }
+                updateUserUI(); updateAdminAccess();
+                const ticketQuery = isOwner ? ticketsRef : ticketsRef.where('userId', '==', user.uid);
+                ticketsUnsubscribe = ticketQuery.onSnapshot((snap) => {
+                    liveTickets = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderMyPasses();
+                    if (isOwner) renderAdminTickets();
+                }, (err) => showToast('Could not load tickets: ' + err.message, 'error'));
+            });
         }
 
         function updateUserUI() {
             const profileArea = document.getElementById('userProfileArea');
             const authBtnNav = document.getElementById('authBtnNav');
-
             if (currentUser) {
-                profileArea.classList.remove('hidden');
-                authBtnNav.classList.add('hidden');
+                profileArea.classList.remove('hidden'); authBtnNav.classList.add('hidden');
                 document.getElementById('userNameDisplay').innerText = currentUser.name;
-                document.getElementById('userRoleBadge').innerText = currentUser.role || 'Student';
-                document.getElementById('userAvatar').innerText = currentUser.name.charAt(0).toUpperCase();
-            } else {
-                profileArea.classList.add('hidden');
-                authBtnNav.classList.remove('hidden');
-            }
+                document.getElementById('userRoleBadge').innerText = isOwner ? 'Owner' : 'Attendee';
+                document.getElementById('userAvatar').innerText = (currentUser.name || 'U').charAt(0).toUpperCase();
+            } else { profileArea.classList.add('hidden'); authBtnNav.classList.remove('hidden'); }
             renderMyPasses();
         }
 
-        function openAuthModal() {
-            document.getElementById('authModal').classList.remove('hidden');
+        function updateAdminAccess() {
+            const gate = document.getElementById('adminAuthGate');
+            const dashboard = document.getElementById('adminDashboard');
+            if (isOwner) { gate.classList.add('hidden'); dashboard.classList.remove('hidden'); renderAdminTickets(); }
+            else { gate.classList.remove('hidden'); dashboard.classList.add('hidden'); }
         }
 
-        function closeAuthModal() {
-            document.getElementById('authModal').classList.add('hidden');
-        }
+        function openAuthModal() { document.getElementById('authModal').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('authModal').classList.add('hidden'); }
 
         function switchAuthMode(mode) {
             const signInForm = document.getElementById('signInForm');
             const signUpForm = document.getElementById('signUpForm');
             const tabSignIn = document.getElementById('authTabSignIn');
             const tabSignUp = document.getElementById('authTabSignUp');
-
             if (mode === 'signin') {
-                signInForm.classList.remove('hidden');
-                signUpForm.classList.add('hidden');
+                signInForm.classList.remove('hidden'); signUpForm.classList.add('hidden');
                 tabSignIn.className = "flex-1 py-3 font-bold text-sm text-cyan-400 border-b-2 border-cyan-400";
                 tabSignUp.className = "flex-1 py-3 font-bold text-sm text-gray-400 border-b-2 border-transparent hover:text-white";
             } else {
-                signInForm.classList.add('hidden');
-                signUpForm.classList.remove('hidden');
+                signInForm.classList.add('hidden'); signUpForm.classList.remove('hidden');
                 tabSignUp.className = "flex-1 py-3 font-bold text-sm text-purple-400 border-b-2 border-purple-400";
                 tabSignIn.className = "flex-1 py-3 font-bold text-sm text-gray-400 border-b-2 border-transparent hover:text-white";
             }
         }
 
-        function handleSignUp(e) {
+        async function handleSignUp(e) {
             e.preventDefault();
             const name = document.getElementById('regName').value.trim();
             const email = document.getElementById('regEmail').value.trim().toLowerCase();
             const password = document.getElementById('regPassword').value;
-            const role = document.getElementById('regRole').value;
-
-            const users = getUsersDB();
-            if (users.find(u => u.email === email)) {
-                showToast("Account with this email already exists!", "error");
-                return;
-            }
-
-            const newUser = {
-                id: 'USR_' + Math.random().toString(36).substr(2, 9),
-                name,
-                email,
-                password, // Saved into local storage
-                role,
-                created: new Date().toISOString()
-            };
-
-            users.push(newUser);
-            saveUsersDB(users);
-
-            // Log user in
-            currentUser = { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role };
-            localStorage.setItem(STORAGE_SESSION, JSON.stringify(currentUser));
-            updateUserUI();
-            closeAuthModal();
-            showToast(`Welcome ${name}! Account registered successfully.`, "success");
+            try {
+                const credential = await auth.createUserWithEmailAndPassword(email, password);
+                await credential.user.updateProfile({ displayName: name });
+                await db.collection('users').doc(credential.user.uid).set({ name, email, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                closeAuthModal(); showToast(`Welcome ${name}! Account created successfully.`, 'success');
+            } catch (err) { showToast(err.message, 'error'); }
         }
 
-        function handleSignIn(e) {
+        async function handleSignIn(e) {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value;
-
-            const users = getUsersDB();
-            const user = users.find(u => u.email === email && u.password === password);
-
-            if (!user) {
-                showToast("Invalid email or password credentials!", "error");
-                return;
-            }
-
-            currentUser = { id: user.id, name: user.name, email: user.email, role: user.role };
-            localStorage.setItem(STORAGE_SESSION, JSON.stringify(currentUser));
-            updateUserUI();
-            closeAuthModal();
-            showToast(`Logged in as ${user.name}`, "success");
+            try { await auth.signInWithEmailAndPassword(email, password); closeAuthModal(); showToast('Signed in successfully.', 'success'); }
+            catch (err) { showToast(err.message, 'error'); }
         }
 
-        function logoutUser() {
-            currentUser = null;
-            localStorage.removeItem(STORAGE_SESSION);
-            updateUserUI();
-            showToast("Signed out successfully.", "info");
+        async function logoutUser() {
+            try { await auth.signOut(); showToast('Signed out successfully.', 'info'); }
+            catch (err) { showToast(err.message, 'error'); }
         }
 
         // ================= NAVIGATION & TABS =================
@@ -788,41 +765,22 @@
             document.getElementById('mobileMenu').classList.toggle('hidden');
         }
 
-        // ================= TICKET BOOKING & ENCRYPTED PASSES =================
-        function getTicketsDB() {
-            return JSON.parse(localStorage.getItem(STORAGE_TICKETS) || "[]");
-        }
-
-        function saveTicketsDB(tickets) {
-            localStorage.setItem(STORAGE_TICKETS, JSON.stringify(tickets));
-        }
-
-        function initiatingBooking(type) {
-            if (!currentUser) {
-                showToast("Please sign in or register an account to book tickets!", "warning");
-                openAuthModal();
-                return;
+        // ================= FIRESTORE TICKET BOOKING =================
+        async function initiatingBooking(type) {
+            if (!currentUser || !auth.currentUser) {
+                showToast("Please sign in or register an account to book tickets!", "warning"); openAuthModal(); return;
             }
-
-            const tickets = getTicketsDB();
             const price = type === 'VIP' ? siteSettings.priceVIP : siteSettings.priceStandard;
-
-            const newTicket = {
-                id: 'TKT_' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userEmail: currentUser.email,
-                type: type,
-                price: price,
-                status: 'Pending Approval', // Default state until admin approves
-                tokenHash: null,
-                timestamp: new Date().toLocaleString()
-            };
-
-            tickets.push(newTicket);
-            saveTicketsDB(tickets);
-            showToast(`${type} Pass request submitted! Awaiting Admin Gate Clearance.`, "success");
-            switchTab('mypass');
+            const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+            try {
+                await ticketsRef.add({
+                    userId: auth.currentUser.uid, userName: currentUser.name, userEmail: currentUser.email,
+                    type, price, status: 'Pending Approval', tokenHash: null, qrToken: token,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                showToast(`${type} Pass request submitted! Awaiting cash payment approval.`, "success");
+                switchTab('mypass');
+            } catch (err) { showToast('Booking failed: ' + err.message, 'error'); }
         }
 
         // Simple cryptographic-style token generator
@@ -849,7 +807,7 @@
                 return;
             }
 
-            const tickets = getTicketsDB().filter(t => t.userId === currentUser.id);
+            const tickets = liveTickets.filter(t => t.userId === currentUser.id);
 
             if (tickets.length === 0) {
                 container.innerHTML = `
@@ -911,7 +869,7 @@
                 setTimeout(() => {
                     const qrBox = document.getElementById(`qr-container-${ticket.id}`);
                     qrBox.innerHTML = '';
-                    const payload = isApproved ? ticket.tokenHash : `PENDING_${ticket.id}`;
+                    const payload = isApproved ? JSON.stringify({ ticketId: ticket.id, token: ticket.qrToken }) : `PENDING_${ticket.id}`;
                     new QRCode(qrBox, {
                         text: payload,
                         width: 140,
@@ -924,111 +882,143 @@
             });
         }
 
-        // ================= ADMIN PORTAL & APPROVAL WORKFLOW =================
+        // ================= OWNER PORTAL & APPROVAL WORKFLOW =================
         function verifyAdminPasscode() {
-            const input = document.getElementById('adminPasscodeInput').value;
-            if (input === siteSettings.adminPasscode) {
-                document.getElementById('adminAuthGate').classList.add('hidden');
-                document.getElementById('adminDashboard').classList.remove('hidden');
-                showToast("Admin portal unlocked", "success");
-                renderAdminTickets();
-            } else {
-                showToast("Incorrect Admin Passcode!", "error");
-            }
+            if (!isOwner) { showToast('Owner access required. Sign in with an authorized owner account.', 'error'); return; }
+            updateAdminAccess(); renderAdminTickets();
         }
-
-        function lockAdminPortal() {
-            document.getElementById('adminAuthGate').classList.remove('hidden');
-            document.getElementById('adminDashboard').classList.add('hidden');
-            document.getElementById('adminPasscodeInput').value = '';
-        }
+        function lockAdminPortal() { updateAdminAccess(); }
 
         function renderAdminTickets() {
-            const tickets = getTicketsDB();
             const tbody = document.getElementById('adminTicketsTable');
+            if (!tbody) return;
             tbody.innerHTML = '';
-
-            const pending = tickets.filter(t => t.status === 'Pending Approval').length;
-            document.getElementById('pendingCountBadge').innerText = `${pending} Pending`;
-
-            if (tickets.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No ticket records found.</td></tr>`;
+            if (!isOwner) {
+                document.getElementById('pendingCountBadge').innerText = 'Owner only';
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">Sign in with an authorized owner account.</td></tr>`;
                 return;
             }
-
+            const tickets = liveTickets;
+            const pending = tickets.filter(t => t.status === 'Pending Approval').length;
+            document.getElementById('pendingCountBadge').innerText = `${pending} Pending`;
+            if (!tickets.length) { tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">No ticket records found.</td></tr>`; return; }
             tickets.forEach(t => {
-                const tr = document.createElement('tr');
-                const isApp = t.status === 'Approved';
-                tr.innerHTML = `
-                    <td class="p-3">
-                        <div class="font-bold text-white">${t.userName}</div>
-                        <div class="text-[10px] text-gray-400">${t.userEmail}</div>
-                    </td>
-                    <td class="p-3"><span class="px-2 py-0.5 rounded font-mono text-[10px] ${t.type === 'VIP' ? 'bg-purple-950 text-purple-400' : 'bg-cyan-950 text-cyan-400'}">${t.type}</span></td>
-                    <td class="p-3">
-                        <span class="px-2 py-0.5 rounded text-[10px] ${isApp ? 'bg-green-950 text-green-400' : 'bg-yellow-950 text-yellow-400'}">${t.status}</span>
-                    </td>
-                    <td class="p-3 font-mono text-[9px] text-gray-400">${t.tokenHash ? t.tokenHash.substr(0, 12) + '...' : 'None'}</td>
-                    <td class="p-3 text-right">
-                        ${!isApp ? `
-                            <button onclick="approveTicket('${t.id}')" class="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-[10px]">
-                                Approve
-                            </button>
-                        ` : `
-                            <button onclick="revokeTicket('${t.id}')" class="px-3 py-1 rounded bg-red-950 hover:bg-red-900 text-red-400 border border-red-500/30 text-[10px]">
-                                Revoke
-                            </button>
-                        `}
-                    </td>
-                `;
+                const tr = document.createElement('tr'); const approved = t.status === 'Approved';
+                const safe = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+                tr.innerHTML = `<td class="p-3"><div class="font-bold text-white">${safe(t.userName)}</div><div class="text-[10px] text-gray-400">${safe(t.userEmail)}</div></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded font-mono text-[10px]">${safe(t.type)}</span></td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px]">${safe(t.status)}</span></td>
+                    <td class="p-3 font-mono text-[9px] text-gray-400">${t.qrToken ? safe(t.qrToken.slice(0,12))+'...' : 'None'}</td>
+                    <td class="p-3 text-right">${!approved ? `<button onclick="approveTicket('${t.id}')" class="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-[10px]">Confirm cash & approve</button>` : `<button onclick="revokeTicket('${t.id}')" class="px-3 py-1 rounded bg-red-950 hover:bg-red-900 text-red-400 border border-red-500/30 text-[10px]">Revoke</button>`}</td>`;
                 tbody.appendChild(tr);
             });
         }
 
         async function approveTicket(ticketId) {
-            let tickets = getTicketsDB();
-            const index = tickets.findIndex(t => t.id === ticketId);
-            if (index !== -1) {
-                tickets[index].status = 'Approved';
-                // Cryptographic token computation
-                tickets[index].tokenHash = await generateSHA256Hash(ticketId + "_" + tickets[index].userId + "_" + Date.now());
-                saveTicketsDB(tickets);
-                renderAdminTickets();
-                showToast(`Ticket ${ticketId} approved & cryptographic pass unlocked!`, "success");
-            }
+            if (!isOwner || !auth.currentUser) { showToast('Owner access required.', 'error'); return; }
+            try {
+                const ref = ticketsRef.doc(ticketId); const snap = await ref.get();
+                if (!snap.exists) throw new Error('Ticket not found.');
+                await ref.update({ status: 'Approved', approvedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy: auth.currentUser.uid });
+                showToast(`Ticket ${ticketId} approved. Confirm only after cash is received.`, 'success');
+            } catch (err) { showToast('Approval failed: ' + err.message, 'error'); }
         }
 
-        function revokeTicket(ticketId) {
-            let tickets = getTicketsDB();
-            const index = tickets.findIndex(t => t.id === ticketId);
-            if (index !== -1) {
-                tickets[index].status = 'Pending Approval';
-                tickets[index].tokenHash = null;
-                saveTicketsDB(tickets);
-                renderAdminTickets();
-                showToast(`Ticket ${ticketId} status revoked.`, "info");
-            }
+        async function revokeTicket(ticketId) {
+            if (!isOwner) { showToast('Owner access required.', 'error'); return; }
+            try { await ticketsRef.doc(ticketId).update({ status: 'Pending Approval', approvedAt: firebase.firestore.FieldValue.delete(), approvedBy: firebase.firestore.FieldValue.delete() }); showToast('Ticket approval revoked.', 'info'); }
+            catch (err) { showToast('Could not revoke ticket: ' + err.message, 'error'); }
         }
 
-        // QR Scanner Logic
-        function startQRScanner() {
+        // QR Scanner Logic (Android Chrome-friendly)
+        async function startQRScanner() {
+            const reader = document.getElementById('qr-reader');
+
+            if (!reader) {
+                showToast('QR scanner area was not found on this page.', 'error');
+                return;
+            }
+            if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                reader.innerHTML = '<div class="p-4 text-sm text-yellow-300">Camera access requires HTTPS. Open the website using its https:// address in Chrome.</div>';
+                showToast('Camera requires a secure HTTPS page.', 'error');
+                return;
+            }
+            if (typeof Html5Qrcode === 'undefined') {
+                reader.innerHTML = '<div class="p-4 text-sm text-red-300">QR scanner library could not load. Check your internet connection and reload the page.</div>';
+                showToast('QR scanner library failed to load.', 'error');
+                return;
+            }
+
+            // Stop/clear any previous scanner fully before creating another one.
             if (html5QrScanner) {
-                html5QrScanner.clear();
+                try {
+                    if (html5QrScanner.isScanning) await html5QrScanner.stop();
+                } catch (stopError) {
+                    // It may not have started; continue with cleanup.
+                }
+                try { await html5QrScanner.clear(); } catch (clearError) {}
+                html5QrScanner = null;
             }
 
-            html5QrScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: { width: 200, height: 200 } });
-            html5QrScanner.render((decodedText) => {
-                const tickets = getTicketsDB();
-                const matched = tickets.find(t => t.tokenHash === decodedText);
+            reader.innerHTML = '';
+            html5QrScanner = new Html5Qrcode('qr-reader');
 
-                if (matched) {
-                    showToast(`VALID ENTRY PASS! Attendee: ${matched.userName} (${matched.type} Pass)`, "success");
-                } else {
-                    showToast("INVALID OR UNAPPROVED GATE PASS!", "error");
+            try {
+                await html5QrScanner.start(
+                    { facingMode: 'environment' },
+                    {
+                        fps: 10,
+                        qrbox: (viewfinderWidth, viewfinderHeight) => {
+                            const size = Math.max(150, Math.min(240, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7)));
+                            return { width: size, height: size };
+                        },
+                        aspectRatio: 1.0
+                    },
+                    async (decodedText) => {
+                        // Prevent overlapping checks when the same QR is read repeatedly.
+                        try {
+                            if (!isOwner) {
+                                showToast('Only owners can verify tickets.', 'error');
+                                return;
+                            }
+                            const payload = JSON.parse(decodedText);
+                            if (!payload || !payload.ticketId || !payload.token) {
+                                showToast('INVALID QR CODE!', 'error');
+                                return;
+                            }
+                            const snap = await ticketsRef.doc(payload.ticketId).get();
+                            if (snap.exists) {
+                                const t = snap.data();
+                                if (t.status === 'Approved' && t.qrToken === payload.token) {
+                                    showToast(`VALID ENTRY PASS! Attendee: ${t.userName} (${t.type} Pass)`, 'success');
+                                } else {
+                                    showToast('INVALID OR UNAPPROVED GATE PASS!', 'error');
+                                }
+                            } else {
+                                showToast('INVALID TICKET!', 'error');
+                            }
+                        } catch (e) {
+                            showToast('INVALID QR CODE!', 'error');
+                        }
+                    },
+                    (_scanError) => {
+                        // Per-frame scan failures are normal; ignore them.
+                    }
+                );
+            } catch (err) {
+                let message = 'Could not start the camera.';
+                if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+                    message = 'Camera permission was denied. In Chrome site settings, allow Camera and try again.';
+                } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
+                    message = 'No available camera was found by the browser.';
+                } else if (err && (err.name === 'NotReadableError' || err.name === 'TrackStartError')) {
+                    message = 'The camera may be busy in another app or browser tab. Close other camera apps and try again.';
+                } else if (err && err.message) {
+                    message = `${message} ${err.message}`;
                 }
-            }, (error) => {
-                // Ignore scanner scan loop errors
-            });
+                reader.innerHTML = `<div class="p-4 text-sm text-red-300">${message.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`;
+                showToast(message, 'error');
+            }
         }
 
         // ================= COUNTDOWN TIMER =================
